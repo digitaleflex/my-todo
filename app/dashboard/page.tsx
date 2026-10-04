@@ -1,3 +1,6 @@
+import { requireUser } from "@/lib/session";
+import { LogoutButton } from "./logout-button";
+
 const tasks = [
   { title: "Sécurité sociale", priority: "HIGH" },
   { title: "Rechercher sérieusement un logement", priority: "HIGH" },
@@ -5,7 +8,9 @@ const tasks = [
   { title: "Contrôle de gestion", priority: "MEDIUM" }
 ];
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
+  const user = await requireUser();
+
   return (
     <main className="min-h-screen px-5 py-8 md:px-10">
       <div className="mx-auto max-w-6xl">
@@ -13,8 +18,12 @@ export default function DashboardPage() {
           <div>
             <p className="text-sm text-zinc-500">MY TODO</p>
             <h1 className="mt-1 text-3xl font-semibold">Cette semaine</h1>
+            <p className="mt-1 text-sm text-zinc-400">Connecté en tant que {user.email}</p>
           </div>
-          <button className="rounded-xl bg-white px-4 py-2 text-black font-medium">+ Tâche</button>
+          <div className="flex items-center gap-3">
+            <button className="rounded-xl bg-white px-4 py-2 text-black font-medium">+ Tâche</button>
+            <LogoutButton />
+          </div>
         </div>
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {tasks.map((task) => (
