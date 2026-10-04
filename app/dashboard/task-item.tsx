@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import type { Task } from "@/generated/prisma/client";
+import { Badge, Button, Input, Select, Textarea } from "@/components/ui";
 import { deleteTaskAction, toggleTaskAction, updateTaskAction } from "./actions";
 
 const priorityLabel: Record<Task["priority"], string> = {
@@ -9,6 +10,18 @@ const priorityLabel: Record<Task["priority"], string> = {
   HIGH: "Haute",
   MEDIUM: "Moyenne",
 };
+
+const priorityOptions = [
+  { value: "LOW", label: "Priorité basse" },
+  { value: "MEDIUM", label: "Priorité moyenne" },
+  { value: "HIGH", label: "Priorité haute" },
+];
+
+const statusOptions = [
+  { value: "TODO", label: "À faire" },
+  { value: "IN_PROGRESS", label: "En cours" },
+  { value: "DONE", label: "Terminée" },
+];
 
 function formatDueDate(value: Date | null): string | null {
   if (!value) return null;
@@ -19,11 +32,14 @@ function formatDueDate(value: Date | null): string | null {
   });
 }
 
+/** Carte tâche : lecture, complétion, édition en ligne et suppression. */
 export function TaskItem({ task }: { task: Task }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
+  const formId = useId();
   const done = task.status === "DONE";
+  const dueDateLabel = formatDueDate(task.dueDate);
 
   function run(action: () => Promise<{ ok: true } | { error: string }>) {
     setError(null);
@@ -51,89 +67,94 @@ export function TaskItem({ task }: { task: Task }) {
   }
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-      <div className="flex items-center gap-3">
+    <article className="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
+      <div className="flex items-start gap-3">
         <input
           type="checkbox"
           checked={done}
           disabled={pending}
           onChange={onToggle}
-          aria-label={done ? "Rouvrir la tâche" : "Terminer la tâche"}
+          aria-label={done ? `Rouvrir la tâche ${task.title}` : `Terminer la tâche ${task.title}`}
+          className="mt-1 size-5 shrink-0 accent-white"
         />
-        <span className={`flex-1 font-medium ${done ? "text-zinc-500 line-through" : ""}`}>
-          {task.title}
-        </span>
-        <button
-          onClick={() => setEditing((v) => !v)}
-          disabled={pending}
-          className="text-sm text-zinc-400 hover:text-white disabled:opacity-60"
-        >
-          {editing ? "Fermer" : "Modifier"}
-        </button>
-        <button
-          onClick={onDelete}
-          disabled={pending}
-          className="text-sm text-zinc-400 hover:text-red-400 disabled:opacity-60"
-        >
-          Supprimer
-        </button>
+        <div className="min-w-0 flex-1">
+          <p className={`font-medium ${done ? "text-zinc-500 line-through" : ""}`}>{task.title}</p>
+          {task.description && !editing && (
+            <p className="mt-1 text-sm text-zinc-400">{task.description}</p>
+          )}
+        </div>
       </div>
 
-      {task.description && !editing && (
-        <p className="mt-2 text-sm text-zinc-400">{task.description}</p>
-      )}
-      <p className="mt-3 text-xs text-zinc-500">
-        {priorityLabel[task.priority]}
-        {formatDueDate(task.dueDate) ? ` · ${formatDueDate(task.dueDate)}` : ""}
-        {task.status === "IN_PROGRESS" ? " · En cours" : ""}
-      </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Badge tone={task.priority === "HIGH" ? "danger" : task.priority === "MEDIUM" ? "warning" : "neutral"}>
+          {priorityLabel[task.priority]}
+        </Badge>
+        {dueDateLabel && <Badge>{dueDateLabel}</Badge>}
+        {task.status === "IN_PROGRESS" && <Badge tone="success">En cours</Badge>}
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setEditing((v) => !v)}
+          disabled={pending}
+          aria-expanded={editing}
+          aria-controls={`${formId}-form`}
+        >
+          {editing ? "Fermer" : "Modifier"}
+        </Button>
+        <Button variant="danger" size="sm" onClick={onDelete} disabled={pending}>
+          Supprimer
+        </Button>
+      </div>
 
       {editing && (
-        <form action={onSave} className="mt-4 space-y-3 border-t border-zinc-800 pt-4">
+        <form
+          id={`${formId}-form`}
+          action={onSave}
+          className="mt-4 space-y-3 border-t border-zinc-800 pt-4"
+        >
           <input type="hidden" name="id" value={task.id} />
-          <input
-            name="title"
-            defaultValue={task.title}
-            required
-            maxLength={200}
-            disabled={pending}
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3"
-          />
-          <textarea
+          <Input name="title" label="Titre" defaultValue={task.title} required maxLength={200} disabled={pending} />
+          <Textarea
             name="description"
+            label="Description (optionnel)"
             defaultValue={task.description ?? ""}
-            maxLength={2000}
             rows={2}
+            maxLength={2000}
             disabled={pending}
-            placeholder="Description (optionnel)"
-            className="w-full rounded-xl border border-zinc-800 bg-zinc-900 p-3"
           />
           <div className="flex flex-col gap-3 md:flex-row">
-            <select name="priority" defaultValue={task.priority} disabled={pending} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-              <option value="LOW">Basse</option>
-              <option value="MEDIUM">Moyenne</option>
-              <option value="HIGH">Haute</option>
-            </select>
-            <select name="status" defaultValue={task.status} disabled={pending} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3">
-              <option value="TODO">À faire</option>
-              <option value="IN_PROGRESS">En cours</option>
-              <option value="DONE">Terminée</option>
-            </select>
-            <input
+            <Select
+              name="priority"
+              label="Priorité"
+              options={priorityOptions}
+              defaultValue={task.priority}
+              disabled={pending}
+            />
+            <Select
+              name="status"
+              label="Statut"
+              options={statusOptions}
+              defaultValue={task.status}
+              disabled={pending}
+            />
+            <Input
               name="dueDate"
               type="date"
+              label="Échéance"
               defaultValue={task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : ""}
               disabled={pending}
-              className="rounded-xl border border-zinc-800 bg-zinc-900 p-3"
             />
-            <button disabled={pending} className="rounded-xl bg-white px-5 py-3 text-black font-medium disabled:opacity-60">
-              {pending ? "Enregistrement…" : "Enregistrer"}
-            </button>
           </div>
+          <Button type="submit" disabled={pending}>
+            {pending ? "Enregistrement…" : "Enregistrer"}
+          </Button>
         </form>
       )}
 
       {error && <p role="alert" className="mt-3 text-sm text-red-400">{error}</p>}
-    </div>
+    </article>
   );
 }
