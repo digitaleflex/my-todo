@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { assertWorkspaceMember } from "@/lib/workspace";
-import { dayBoundsUTC } from "@/lib/dates";
+import { dayBoundsUTC, weekDaysUTC } from "@/lib/dates";
 import type { CreateTaskInput, UpdateTaskInput } from "@/lib/validators/task";
 
 async function getTaskForUser(taskId: string, userId: string) {
@@ -125,4 +125,63 @@ export async function getTodayOverview(
   const progress = open + doneToday === 0 ? 0 : Math.round((doneToday / (open + doneToday)) * 100);
 
   return { overdue, dueToday, undated, upcoming, completedToday, stats: { open, doneToday, progress } };
+}
+
+export interface WeekDay {
+  date: Date;
+  tasks: Awaited<ReturnType<typeof listTasks>>;
+  done: number;
+  total: number;
+  progress: number;
+}
+
+export interface WeekOverview {
+  days: WeekDay[];
+  undated: Awaited<ReturnType<typeof listTasks>>;
+  weekStart: Date;
+  weekEnd: Date;
+}
+
+/**
+ * Vue semaine : 7 jours (lundi-dimanche UTC) avec les tâches ouvertes
+ * et terminées échéant chaque jour, plus les tâches ouvertes sans date.
+ * `weekOffset` : 0 = semaine courante, ±1 = précédente/suivante…
+ */
+export async function getWeekOverview(
+  userId: string,
+  workspaceId: string,
+  weekOffset: number,
+  now: Date = new Date()
+): Promise<WeekOverview> {
+  const tasks = await listTasks(userId, workspaceId);
+  const days = weekDaysUTC(now, weekOffset).map((date) => ({
+    date,
+    tasks: [] as typeof tasks,
+    done: 0,
+    total: 0,
+    progress: 0,
+  }));
+  const undated: typeof tasks = [];
+  const weekStart = days[0].date;
+  const weekEnd = new Date(days[6].date.getTime() + 24 * 60 * 60 * 1000);
+
+  for (const task of tasks) {
+    if (!task.dueDate) {
+      if (task.status !== "DONE") undated.push(task);
+      continue;
+    }
+    if (task.dueDate < weekStart || task.dueDate >= weekEnd) continue;
+    const day = days.find(
+      (d) => task.dueDate! >= d.date && task.dueDate!.getTime() < d.date.getTime() + 24 * 60 * 60 * 1000
+    );
+    if (day) day.tasks.push(task);
+  }
+
+  for (const day of days) {
+    day.done = day.tasks.filter((t) => t.status === "DONE").length;
+    day.total = day.tasks.length;
+    day.progress = day.total === 0 ? 0 : Math.round((day.done / day.total) * 100);
+  }
+
+  return { days, undated, weekStart, weekEnd };
 }

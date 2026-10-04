@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireUser, requireWorkspace } from "@/lib/session";
 import { formatTodayFR } from "@/lib/dates";
 import { getTodayOverview } from "@/lib/tasks";
@@ -45,6 +46,9 @@ export default async function DashboardPage() {
             <p className="mt-1 text-sm text-zinc-400 capitalize">
               {formatTodayFR()} · {user.email}
             </p>
+            <Link href="/dashboard/week" className="mt-2 inline-block text-sm text-zinc-400 hover:text-white">
+              Voir la semaine →
+            </Link>
           </div>
           <LogoutButton />
         </div>
