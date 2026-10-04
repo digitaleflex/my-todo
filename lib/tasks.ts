@@ -1,16 +1,22 @@
 import { db } from "@/lib/db";
+import { accessDenied } from "@/lib/errors";
 import { assertWorkspaceMember } from "@/lib/workspace";
 import { dayBoundsUTC, weekDaysUTC } from "@/lib/dates";
 import type { CreateTaskInput, UpdateTaskInput } from "@/lib/validators/task";
 
+/**
+ * Charge une tâche en vérifiant l'appartenance au workspace.
+ * Absente ET interdite lèvent la même erreur : impossible de sonder
+ * l'existence d'un ID appartenant à un autre utilisateur.
+ */
 async function getTaskForUser(taskId: string, userId: string) {
   const task = await db.task.findUnique({ where: { id: taskId } });
   if (!task) {
-    throw new Error("Tâche introuvable");
+    throw accessDenied();
   }
   const membership = await assertWorkspaceMember(task.workspaceId, userId);
   if (!membership) {
-    throw new Error("Accès refusé");
+    throw accessDenied();
   }
   return task;
 }
@@ -18,7 +24,7 @@ async function getTaskForUser(taskId: string, userId: string) {
 export async function listTasks(userId: string, workspaceId: string) {
   const membership = await assertWorkspaceMember(workspaceId, userId);
   if (!membership) {
-    throw new Error("Accès refusé");
+    throw accessDenied();
   }
   return db.task.findMany({
     where: { workspaceId },
@@ -29,7 +35,7 @@ export async function listTasks(userId: string, workspaceId: string) {
 export async function createTask(userId: string, workspaceId: string, input: CreateTaskInput) {
   const membership = await assertWorkspaceMember(workspaceId, userId);
   if (!membership) {
-    throw new Error("Accès refusé");
+    throw accessDenied();
   }
   return db.task.create({
     data: {

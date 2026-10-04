@@ -62,6 +62,19 @@ model Verification {
   @@index([identifier])
 }
 
+// Compteurs de limitation de débit (Better Auth, stockage base).
+// Nécessaire en serverless où le stockage mémoire est réinitialisé à chaque instance.
+// `lastRequest` est un BigInt (epoch ms) : Better Auth écrit un timestamp
+// numérique et l'adaptateur le reconvertit après lecture.
+model RateLimit {
+  id          String   @id
+  key         String   @unique
+  count       Int
+  lastRequest BigInt
+
+  @@index([lastRequest])
+}
+
 model Workspace {
   id        String            @id @default(cuid())
   name      String
