@@ -1,10 +1,21 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { db } from "@/lib/db";
+import { ensurePersonalWorkspace } from "@/lib/workspace";
 
 export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET as string,
   database: prismaAdapter(db, { provider: "postgresql" }),
+  databaseHooks: {
+    user: {
+      create: {
+        // Provisionne l'espace personnel à l'inscription (rôle OWNER).
+        after: async (user) => {
+          await ensurePersonalWorkspace(user.id, user.name);
+        },
+      },
+    },
+  },
   emailAndPassword: {
     enabled: true,
     minPasswordLength: 8,
